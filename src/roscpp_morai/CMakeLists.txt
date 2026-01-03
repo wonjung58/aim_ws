@@ -118,3 +118,11 @@ target_compile_features(lidar_aabb_ver2 PRIVATE cxx_std_11)
 target_link_libraries(lidar_aabb_ver2 ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_include_directories(lidar_aabb_ver2 PRIVATE ${PCL_INCLUDE_DIRS})
 add_dependencies(lidar_aabb_ver2 ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+# ----------------------------------------
+# LIDAR Patch Test Node
+add_executable(patch src/perception/lidar/patch.cpp)
+target_compile_features(patch PRIVATE cxx_std_11)
+target_link_libraries(patch ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_include_directories(patch PRIVATE ${PCL_INCLUDE_DIRS})
+add_dependencies(patch ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
