@@ -1,0 +1,9 @@
+1.make pkg
+cd /root/ws/src
+catkin_create_pkg roscpp_morai roscpp nav_msgs geometry_msgs morai_msgs
+
+2.build pkg
+cd /root/ws
+rosdep install --from-paths src -r -y   # 설치 가능한 의존성 자동설치
+catkin_make -DCMAKE_BUILD_TYPE=RelWithDebInfo
+source devel/setup.bash

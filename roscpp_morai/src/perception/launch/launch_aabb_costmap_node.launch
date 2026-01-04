@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="roscpp_morai" type="lidar_aabb_costmap_node" name="lidar_aabb_costmap_node" output="screen">
+    <param name="lidar_topic" value="/lidar3D"/>
+    <param name="costmap_topic" value="/costmap_from_lidar"/>
+
+    <!-- TF 쓰려면 true + costmap_frame을 base_link 등으로 -->
+    <param name="use_tf" value="false"/>
+    <param name="require_tf" value="false"/>
+    <param name="costmap_frame" value="lidar_link"/>
+
+    <param name="map_resolution" value="0.05"/>
+    <param name="map_width" value="50.0"/>
+    <param name="map_height" value="50.0"/>
+
+    <param name="unknown_cost" value="-1"/>
+    <param name="free_cost" value="0"/>
+    <param name="obstacle_cost" value="100"/>
+
+    <param name="min_height" value="-0.5"/>
+    <param name="max_height" value="0.5"/>
+    <param name="lidar_range" value="25.0"/>
+    <param name="voxel_leaf" value="0.10"/>
+
+    <param name="ego_exclusion" value="2.0"/>
+
+    <param name="cluster_tolerance" value="0.4"/>
+    <param name="cluster_min_size" value="20"/>
+    <param name="cluster_max_size" value="2000"/>
+
+    <!-- 초록 박스 cost -->
+    <param name="cav_cost_green" value="75"/>
+    <!-- 박스 주변 두께 (m) -->
+    <param name="inflation_m" value="0.0"/>
+  </node>
+</launch>

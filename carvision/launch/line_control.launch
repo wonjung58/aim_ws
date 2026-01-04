@@ -1,0 +1,13 @@
+<launch>
+  <arg name="ns" default="morai"/>
+  <group ns="$(arg ns)">
+    <!-- 퍼셉션: 창 끄기 -->
+    <node pkg="carvision" type="control_cam_line.py"
+          name="lane_perception" output="screen" respawn="true">
+      <param name="show_window" value="true"/>
+    </node>
+
+    <node pkg="carvision" type="car_morai_cam_line.py"
+          name="lane_controller" output="screen" respawn="true"/>
+  </group>
+</launch>

@@ -1,0 +1,35 @@
+<launch>
+  <!-- YOLO 카메라 감지 노드 (Python) -->
+  <!-- type must be the executable's basename so roslaunch can resolve it -->
+  <node pkg="carvision" type="car_morai_cam_detect.py" name="car_morai_cam_detect" output="screen">
+
+    <!-- 카메라 이미지 토픽 (MORAI) -->
+    <param name="camera_topic" value="/image_jpeg/compressed"/>
+    <!-- YOLO weight 경로: 기본 COCO car 모델 -->
+    <param name="model_path"   value="$(find carvision)/scripts/perception/yolov8n.pt"/>
+    <!-- 필요한 클래스만 감지 (COCO에서 car=2) -->
+    <rosparam param="target_class_ids">[2]</rosparam>
+
+    <!-- 회피 기준 (바운딩박스 높이 %, x 위치) -->
+    <param name="avoid_height_thresh" value="30.0"/>
+    <param name="avoid_x_thresh"      value="350.0"/>
+    <param name="bbox_left_thresh"    value="290.0"/>
+
+  </node>
+
+  <!-- Pure Pursuit + 카메라 기반 회피 노드 (C++) -->
+  <node pkg="carvision" type="avoid_camera_car" name="avoid_camera_car" output="screen">
+
+    <!-- 경로/PP 설정 -->
+    <param name="ref_file"   value="/root/ws/src/carvision/map/ref.txt"/>
+    <param name="path_file"  value="/root/ws/src/carvision/map/Path.txt"/>
+    <param name="wheelbase"  value="3.0"/>
+    <param name="lookahead"  value="4.5"/>
+    <param name="target_kmh" value="15.0"/>
+    <param name="avoid_kmh"  value="8.0"/>
+
+    <!-- YOLO 조건 (C++ 노드 안에서 param으로 읽는 값) -->
+    <param name="bbox_height_thresh" value="30.0"/>
+    <param name="bbox_x_thresh"      value="350.0"/>
+  </node>
+</launch>

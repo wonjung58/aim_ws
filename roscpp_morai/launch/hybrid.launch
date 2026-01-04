@@ -1,0 +1,10 @@
+<launch>
+  <node pkg="hybrid" type="hybrid_node" name="hybrid" output="screen">
+    <param name="yaml_path" value="$(find hybrid)/config3/yaml_hybrid.yaml"/>
+
+    <param name="gps_topic" value="/gps"/>
+    <param name="imu_topic" value="/imu"/>
+    <param name="ego_topic" value="/Ego_topic"/>
+    <param name="cmd_topic" value="/ctrl_cmd_0"/>
+  </node>
+</launch>

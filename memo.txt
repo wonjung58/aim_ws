@@ -1,0 +1,18 @@
+1. /gps
+utonav@autonav-System-Product-Name:~/aim_ws$ rostopic echo /gps
+
+header: 
+  seq: 4
+  stamp: 
+    secs: 1759161510
+    nsecs:  55000000
+  frame_id: "GPS-1"
+latitude: 37.23962901850908
+longitude: 126.7734285739676
+altitude: 29.27641323542595
+eastOffset: 302459.942
+northOffset: 4122635.537
+status: 1
+---
+autonav@autonav-System-Product-Name:~/aim_ws$ 
+
