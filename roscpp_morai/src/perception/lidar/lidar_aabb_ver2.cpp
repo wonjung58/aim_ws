@@ -1,37 +1,39 @@
-#include <ros/ros.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <nav_msgs/OccupancyGrid.h>
-#include <geometry_msgs/PoseArray.h>
-#include <visualization_msgs/MarkerArray.h>
-#include <visualization_msgs/Marker.h>
+#include <Global/Global.hpp>
 
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
+// #include <ros/ros.h>
+// #include <sensor_msgs/PointCloud2.h>
+// #include <nav_msgs/OccupancyGrid.h>
+// #include <geometry_msgs/PoseArray.h>
+// #include <visualization_msgs/MarkerArray.h>
+// #include <visualization_msgs/Marker.h>
 
-#include <pcl/filters/passthrough.h>
-#include <pcl/filters/voxel_grid.h>
+// #include <pcl_conversions/pcl_conversions.h>
+// #include <pcl/point_types.h>
+// #include <pcl/point_cloud.h>
 
-#include <pcl/ModelCoefficients.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
-#include <pcl/segmentation/sac_segmentation.h>
-#include <pcl/filters/extract_indices.h>
+// #include <pcl/filters/passthrough.h>
+// #include <pcl/filters/voxel_grid.h>
 
-#include <pcl/search/kdtree.h>
-#include <pcl/segmentation/extract_clusters.h>
+// #include <pcl/ModelCoefficients.h>
+// #include <pcl/sample_consensus/method_types.h>
+// #include <pcl/sample_consensus/model_types.h>
+// #include <pcl/segmentation/sac_segmentation.h>
+// #include <pcl/filters/extract_indices.h>
 
-#include <Eigen/Dense>
-#include <limits>
-#include <cmath>
-#include <algorithm>
+// #include <pcl/search/kdtree.h>
+// #include <pcl/segmentation/extract_clusters.h>
 
-// TF2
-#include <tf2_ros/transform_listener.h>
-#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
-#include <geometry_msgs/TransformStamped.h>
+// #include <Eigen/Dense>
+// #include <limits>
+// #include <cmath>
+// #include <algorithm>
 
-using std::string;
+// // TF2
+// #include <tf2_ros/transform_listener.h>
+// #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
+// #include <geometry_msgs/TransformStamped.h>
+
+using namespace std;
 
 // ------------------------------
 // Publishers
@@ -123,35 +125,46 @@ struct Detection {
 // ------------------------------
 // Helpers: costmap indexing
 // ------------------------------
+
+// grid index가 맵 밖으로 나갔을 때 경계 안으로 잘라 넣는 용도
 static inline int clampi(int v, int lo, int hi) {
   return std::max(lo, std::min(v, hi));
 }
 
+// costmap 메시지 초기화
 static inline void initCostmap(nav_msgs::OccupancyGrid &cm,
                                const std_msgs::Header &hdr)
 {
   cm.header = hdr;
-  cm.info.resolution = map_resolution;
+  cm.info.resolution = map_resolution; // 한 셀 크기 (m)
 
+  // 맵 크기 (총 셀 개수)
   const int w = (int)std::round(map_width / map_resolution);
   const int h = (int)std::round(map_height / map_resolution);
 
   cm.info.width = w;
   cm.info.height = h;
 
-  // 로컬 costmap: 원점이 프레임(ego) 기준 (0,0)을 중앙에 두도록
+  // 로컬 costmap: costmap 원점이 프레임(ego) 기준 (0,0)을 중앙에 두도록
+  // origin.position : 맵의 왼쪽 아래 코너 위치 = costmap 원점
   cm.info.origin.position.x = -map_width * 0.5;
   cm.info.origin.position.y = -map_height * 0.5;
   cm.info.origin.position.z = 0.0;
   cm.info.origin.orientation.w = 1.0;
 
+  // 모든 셀 unknown으로 초기화
   cm.data.assign(w * h, unknown_cost);
 }
 
+// ------------------------------
+// 월드 좌표 -> 그리드 좌표 변환
+// 월드 좌표가 맵 안에 있는지 검사
+// ------------------------------
 static inline bool worldToGrid(const nav_msgs::OccupancyGrid &cm,
                                float x, float y,
                                int &gx, int &gy)
 {
+  // 월드 좌표 (x, y) -> 그리드 좌표 (gx, gy)
   gx = (int)std::floor((x - cm.info.origin.position.x) / cm.info.resolution);
   gy = (int)std::floor((y - cm.info.origin.position.y) / cm.info.resolution);
 
@@ -171,26 +184,28 @@ static void paintAABB(nav_msgs::OccupancyGrid &cm,
                       float min_x, float min_y, float max_x, float max_y,
                       int8_t value, float inflation = 0.0f)
 {
-  if (min_x > max_x) std::swap(min_x, max_x);
-  if (min_y > max_y) std::swap(min_y, max_y);
+  // min/max 정렬
+  if (min_x > max_x) swap(min_x, max_x);
+  if (min_y > max_y) swap(min_y, max_y);
 
   // inflation 적용
   min_x -= inflation; min_y -= inflation;
   max_x += inflation; max_y += inflation;
 
   int gx0, gy0, gx1, gy1;
+  // AABB 모서리를 grid 좌표로 변환
   if (!worldToGrid(cm, min_x, min_y, gx0, gy0)) {
     // clamp를 위해 일단 계산만
-    gx0 = (int)std::floor((min_x - cm.info.origin.position.x) / cm.info.resolution);
-    gy0 = (int)std::floor((min_y - cm.info.origin.position.y) / cm.info.resolution);
+    gx0 = (int)floor((min_x - cm.info.origin.position.x) / cm.info.resolution);
+    gy0 = (int)floor((min_y - cm.info.origin.position.y) / cm.info.resolution);
   }
   if (!worldToGrid(cm, max_x, max_y, gx1, gy1)) {
-    gx1 = (int)std::floor((max_x - cm.info.origin.position.x) / cm.info.resolution);
-    gy1 = (int)std::floor((max_y - cm.info.origin.position.y) / cm.info.resolution);
+    gx1 = (int) floor((max_x - cm.info.origin.position.x) / cm.info.resolution);
+    gy1 = (int) floor((max_y - cm.info.origin.position.y) / cm.info.resolution);
   }
 
-  if (gx0 > gx1) std::swap(gx0, gx1);
-  if (gy0 > gy1) std::swap(gy0, gy1);
+  if (gx0 > gx1) swap(gx0, gx1);
+  if (gy0 > gy1) swap(gy0, gy1);
 
   gx0 = clampi(gx0, 0, (int)cm.info.width  - 1);
   gx1 = clampi(gx1, 0, (int)cm.info.width  - 1);
@@ -305,8 +320,14 @@ static std::vector<pcl::PointIndices> euclideanCluster(
   return indices;
 }
 
+
+// ------------------------------
+// Helpers: build Detection list
+// 각 클러스터에 대해 AABB + 중심 + 크기 등을 계산 -> Detection 리스트 반환
+// ------------------------------
+
 static std::vector<Detection> buildDetections(
-  const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud,
+  const pcl::PointCloud<pcl::PointXYZI>::Ptr &cloud, // ransac_cloud
   const std::vector<pcl::PointIndices> &clusters,
   const ros::Time &stamp)
 {
@@ -317,8 +338,10 @@ static std::vector<Detection> buildDetections(
     const auto &idxs = clusters[i].indices;
     if (idxs.empty()) continue;
 
-    double sum_x = 0, sum_y = 0, sum_z = 0;
+    // AABB centroid
+    double sum_x = 0, sum_y = 0, sum_z = 0; 
 
+    // AABB min/max
     float min_x =  std::numeric_limits<float>::infinity();
     float min_y =  std::numeric_limits<float>::infinity();
     float min_z =  std::numeric_limits<float>::infinity();
@@ -355,7 +378,9 @@ static std::vector<Detection> buildDetections(
     d.centroid = Eigen::Vector3f(cx, cy, cz);
     d.min_pt = Eigen::Vector3f(min_x, min_y, min_z);
     d.max_pt = Eigen::Vector3f(max_x, max_y, max_z);
+    // AABB 크기
     d.size   = d.max_pt - d.min_pt;
+    // XY 평면에서의 거리
     d.range  = std::sqrt(cx*cx + cy*cy);
     dets.push_back(d);
   }
@@ -363,11 +388,18 @@ static std::vector<Detection> buildDetections(
   return dets;
 }
 
+
+// ------------------------------
+// Helpers: vehicle 후보 조건 검사
+// ------------------------------
 static bool isCavCandidate(const Detection &d)
 {
   const float dx = d.size.x();
   const float dy = d.size.y();
   const float dz = d.size.z();
+
+  // vehicle cluster의 num_points, 높이, 길이, 폭 조건이므로
+  // 원기둥 등의 장애물을 걸러내고 있을 것 -> 원기둥 클러스터 조건 함수 생성해야
 
   if (d.num_points < cav_min_points) return false;
   if (dz < cav_dz_min || dz > cav_dz_max) return false;
@@ -375,6 +407,7 @@ static bool isCavCandidate(const Detection &d)
   if (dy < cav_dy_min || dy > cav_dy_max) return false;
   return true;
 }
+
 
 // ------------------------------
 // Helpers: visualization
@@ -488,7 +521,7 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &in_msg)
   // publish all colored clusters
   publishColoredClustersAll(ransac_cloud, clusters, hdr);
 
-  // 7) detections
+  // 7) detect clusters info
   std::vector<Detection> dets = buildDetections(ransac_cloud, clusters, hdr.stamp);
 
   // messages to publish
