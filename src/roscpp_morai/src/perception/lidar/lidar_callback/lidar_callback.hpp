@@ -7,7 +7,7 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &in_msg)
   const std::string source_frame = normalizeFrame(src_frame_raw);
 
   // 1) TF transform to costmap_frame
-  sensor_msgs::PointCloud2 cloud_tf;
+  sensor_msgs::PointCloud2 cloud_tf; // 맨 처음에 생성 -> 형변환
   std_msgs::Header hdr = in_msg->header;
   hdr.frame_id = source_frame; // normalize
 
@@ -19,7 +19,8 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &in_msg)
       geometry_msgs::TransformStamped tf =
         tfBufferPtr->lookupTransform(target_frame, hdr.frame_id, ros::Time(0), ros::Duration(0.05));
 
-      tf2::doTransform(*in_msg, cloud_tf, tf);
+      tf2::doTransform(*in_msg, cloud_tf, tf); 
+      // ---------- 함수 선언 안 보임 ----------
 
       // header 강제 통일
       hdr = cloud_tf.header;
@@ -59,14 +60,17 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &in_msg)
   if (cloud->empty()) return;
 
   // 3) filters
-  filterByHeight(cloud, g_params.min_height, g_params.max_height);
-  filterByRange(cloud, g_params.lidar_range);
-  if (cloud->empty()) return;
+  // filterByHeight(cloud, g_params.min_height, g_params.max_height);
+  // filterByRange(cloud, g_params.lidar_range);
+  // if (cloud->empty()) return;
 
-  voxelDownsample(cloud, g_params.voxel_leaf);
+  // 3) remove ego ROI
+  pcl::PointCloud<pcl::PointXYZI>::Ptr roi_cloud = 
+  removeEgoROI(cloud, g_params.ego_xmin, g_params.ego_xmax, g_params.ego_ymin, g_params.ego_ymax);
+  if (roi_cloud->empty()) return;
 
-  // 4) remove ego ROI
-  pcl::PointCloud<pcl::PointXYZI>::Ptr roi_cloud = removeEgoROI(cloud, g_params.ego_exclusion);
+  // 4) voxel downsample
+  voxelDownsample(roi_cloud, g_params.voxel_leaf);
   if (roi_cloud->empty()) return;
 
   // 5) RANSAC ground removal
@@ -75,12 +79,12 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &in_msg)
 
   // debug publish: ransac cloud (frame/stamp 통일)
   {
-    sensor_msgs::PointCloud2 out;
-    pcl::toROSMsg(*ransac_cloud, out);
-    out.header = hdr;
-    out.header.frame_id = target_frame;
-    out.header.stamp = in_msg->header.stamp;
-    pub_ransac.publish(out);
+    sensor_msgs::PointCloud2 ransac_out;
+    pcl::toROSMsg(*ransac_cloud, ransac_out);
+    ransac_out.header = hdr;
+    ransac_out.header.frame_id = target_frame;
+    ransac_out.header.stamp = in_msg->header.stamp;
+    pub_ransac.publish(ransac_out);
   }
 
   if (ransac_cloud->empty()) return;
@@ -89,7 +93,7 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &in_msg)
   std::vector<pcl::PointIndices> clusters =
     euclideanCluster(ransac_cloud, g_params.cluster_tolerance, g_params.cluster_min_size, g_params.cluster_max_size);
 
-  // publish all colored clusters
+  // publish all colored clusters_indices
   {
     std_msgs::Header chdr = hdr;
     chdr.frame_id = target_frame;
@@ -98,7 +102,8 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &in_msg)
   }
 
   // 7) detections
-  std::vector<Detection> dets = buildDetections(ransac_cloud, clusters, hdr.stamp);
+  std::vector<Detection> cluster_info = clusterInfo(ransac_cloud, clusters, hdr.stamp);
+  // clusters -> clusters_indices 로 바꾸고싶
 
   // messages to publish (frame/stamp 통일)
   geometry_msgs::PoseArray centers_msg;
@@ -112,6 +117,11 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &in_msg)
   cav_colored->is_dense = true;
 
   int cav_id = 0;
+
+
+  // ========================================================================================
+  // costmap & markers for CAV candidates
+  // ========================================================================================
 
   // 8) init costmap (local around origin)
   nav_msgs::OccupancyGrid costmap;
@@ -133,7 +143,7 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr &in_msg)
   }
 
   // 9) for each detection -> if cav -> publish markers & paint costmap
-  for (const auto &d : dets) {
+  for (const auto &d : cluster_info) {
     if (!isCavCandidate(d)) continue;
 
     Eigen::Vector3f center = 0.5f * (d.min_pt + d.max_pt);

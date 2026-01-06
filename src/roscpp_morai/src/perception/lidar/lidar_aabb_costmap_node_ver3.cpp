@@ -65,7 +65,7 @@ ros::Publisher pub_cav_aabb_center_spheres;
 std::unique_ptr<tf2_ros::Buffer> tfBufferPtr;
 std::unique_ptr<tf2_ros::TransformListener> tfListenerPtr;
 
-// Helper function for frame normalization
+// Helper function for frame name normalization
 static inline std::string normalizeFrame(std::string f) {
   while (!f.empty() && f.front() == '/') f.erase(f.begin());
   return f;

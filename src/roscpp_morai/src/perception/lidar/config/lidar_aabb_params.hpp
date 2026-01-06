@@ -25,13 +25,18 @@ int8_t obstacle_cost = 100;    // occupied
 float inflation_m = 0.0f;      // AABB 박스를 costmap에 칠할 때 주변을 추가로 두껍게(inflation) 칠하는 값 -> AABB 박스를 costmap에 칠할 때 주변을 추가로 두껍게(inflation) 칠하는 값
 
 // lidar prefilter
-float min_height = -3.0f;
-float max_height = 5.0f;
-float lidar_range = 25.0f;
-float voxel_leaf = 0.10f;
+// float min_height = -3.0f;
+// float max_height = 5.0f;
+// float lidar_range = 25.0f;
 
-// ego 제거 ROI
-float ego_exclusion = 2.0f; // |x|<=2 and |y|<=2 영역 제거 ==> 자차 차체/센서 브라켓/지붕 포인트 때문에 생기는 “가짜 클러스터” 방지
+// ego 제거 ROI (passthrough) -> 차체 x, y 값에 따라 세밀한 파라미터 조정 필요
+float ego_xmin = 2.0f; // |x|<=2 and |y|<=2 영역 제거 ==> 자차 차체/센서 브라켓/지붕 포인트 때문에 생기는 “가짜 클러스터” 방지
+float ego_xmax = 2.0f; 
+float ego_ymin = 2.0f;
+float ego_ymax = 2.0f; 
+
+// voxel downsample
+float voxel_leaf = 0.10f;
 
 // RANSAC
 float ransac_dist_thresh = 0.30f; // 평면에서 0.30m 이내면 지면(inlier)로 간주
@@ -77,13 +82,17 @@ static void loadParams(ros::NodeHandle& pnh, LidarAabbParams& P)
 
   pnh.param("inflation_m",    P.inflation_m,    P.inflation_m);
 
-  pnh.param("min_height",     P.min_height,     P.min_height);
-  pnh.param("max_height",     P.max_height,     P.max_height);
-  pnh.param("lidar_range",    P.lidar_range,    P.lidar_range);
-  pnh.param("voxel_leaf",     P.voxel_leaf,     P.voxel_leaf);
+  // pnh.param("min_height",     P.min_height,     P.min_height);
+  // pnh.param("max_height",     P.max_height,     P.max_height);
+  // pnh.param("lidar_range",    P.lidar_range,    P.lidar_range);
+  // pnh.param("ego_exclusion",  P.ego_exclusion,  P.ego_exclusion);
+  pnh.param("ego_xmin",       P.ego_xmin,       P.ego_xmin);
+  pnh.param("ego_xmax",       P.ego_xmax,       P.ego_xmax);
+  pnh.param("ego_ymin",       P.ego_ymin,       P.ego_ymin);
+  pnh.param("ego_ymax",       P.ego_ymax,       P.ego_ymax);  
 
-  pnh.param("ego_exclusion",  P.ego_exclusion,  P.ego_exclusion);
-
+  pnh.param("voxel_leaf", P.voxel_leaf, P.voxel_leaf);
+  
   pnh.param("ransac_dist_thresh",   P.ransac_dist_thresh,   P.ransac_dist_thresh);
   pnh.param("ransac_eps_angle_deg", P.ransac_eps_angle_deg, P.ransac_eps_angle_deg);
   pnh.param("ransac_max_iter",      P.ransac_max_iter,      P.ransac_max_iter);
